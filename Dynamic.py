@@ -3,20 +3,17 @@ import cv2
 import numpy as np
 import random
 import matplotlib.pyplot as plt
-from io import BytesIO
 
-# Global variable for minimum area in rectangle detection
-min_area = 1000
-
-def upload_image():
-    uploaded_file = st.file_uploader("Upload an Image", type=["jpg", "jpeg", "png", "bmp", "tiff"])
-    if uploaded_file is not None:
-        bytes_data = uploaded_file.read()
-        image = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
-        return image
-    else:
-        return None
-    
+stable_colors = [
+    (255, 0, 0),     # Red
+    (0, 255, 0),     # Green
+    (0, 0, 255),     # Blue
+    (255, 255, 0),   # Cyan
+    (255, 0, 255),   # Magenta
+    (0, 255, 255),   # Yellow
+    (128, 0, 128),   # Purple
+    (128, 128, 0)    # Olive
+]
 
 def process_dynamicImage(image):
     if image is None:
@@ -57,8 +54,6 @@ def process_dynamicImage(image):
         if not found_group:
             size_groups.append((area, 1))
 
-    colors = [tuple(random.sample(range(256), 3)) for _ in range(len(size_groups))]
-
     output_image = image.copy()
     for i, contour in enumerate(contours):
         area = cv2.contourArea(contour)
@@ -68,7 +63,7 @@ def process_dynamicImage(image):
         for idx, (group_area, count) in enumerate(size_groups):
             mean_area = group_area / count
             if abs(mean_area - area) <= 800:
-                cv2.drawContours(output_image, [contour], -1, colors[idx], 2)
+                cv2.drawContours(output_image, [contour], -1, stable_colors[idx % len(stable_colors)], 2)
                 M = cv2.moments(contour)
                 if M["m00"] != 0:
                     cX = int(M["m10"] / M["m00"])
@@ -76,14 +71,14 @@ def process_dynamicImage(image):
                 else:
                     cX, cY = 0, 0
                 label = chr(65 + idx)
-                cv2.putText(output_image, label, (cX, cY), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[idx], 2)
+                cv2.putText(output_image, label, (cX, cY), cv2.FONT_HERSHEY_SIMPLEX, 0.5, stable_colors[idx % len(stable_colors)], 2)
                 break
 
     y0, dy = 30, 30
     for i, (group_area, count) in enumerate(size_groups):
         mean_area = group_area / count
         size_label = f"Size {chr(65 + i)}: {count} (Mean Area: {mean_area:.1f})"
-        cv2.putText(output_image, size_label, (10, y0 + i * dy), cv2.FONT_HERSHEY_SIMPLEX, 0.8, colors[i], 2)
+        cv2.putText(output_image, size_label, (10, y0 + i * dy), cv2.FONT_HERSHEY_SIMPLEX, 0.8, stable_colors[i % len(stable_colors)], 2)
 
     output_image_rgb = cv2.cvtColor(output_image, cv2.COLOR_BGR2RGB)
 
@@ -96,18 +91,11 @@ def process_dynamicImage(image):
 
 def dynamicDetection():
     image = upload_image()
-    process_dynamicImage(image)
-
-stable_colors = [
-    (255, 0, 0),     # Red
-    (0, 255, 0),     # Green
-    (0, 0, 255),     # Blue
-    (255, 255, 0),   # Cyan
-    (255, 0, 255),   # Magenta
-    (0, 255, 255),   # Yellow
-    (128, 0, 128),   # Purple
-    (128, 128, 0)    # Olive
-]
+    if image is not None:
+        st.image(image, channels="BGR", use_container_width=True)  # Display uploaded image
+        process_dynamicImage(image)
+    else:
+        st.error("No image uploaded!")
 
 def process_liveDynamic(frame):
     max_width = 800
@@ -193,6 +181,18 @@ def liveDynamic():
         cap.release()
         cv2.destroyAllWindows()
 
+def upload_image():
+    uploaded_file = st.file_uploader("Upload an Image", type=["jpg", "jpeg", "png", "bmp", "tiff"])
+    if uploaded_file is not None:
+        bytes_data = uploaded_file.read()
+        image = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
+        if image is None:
+            st.error("Error decoding image.")
+            return None
+        st.write(f"Image shape: {image.shape}")  # Debugging image shape
+        return image
+    else:
+        return None
 
 def main():
     st.title("Dynamic Screw Object Counting and Detection")
