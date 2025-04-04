@@ -190,7 +190,7 @@ def liveDynamic():
         cv2.destroyAllWindows()
 
 def main():
-    st.title("OpenCV Multiple Objects Counting Using Image Processing")
+    st.title("Dynamic Objects Counting Using Image Processing")
 
     # Load and display an image
     st.image("DynamicScrew.png", caption="Detection Dynamic Objects", use_container_width=True)  # Updated parameter
