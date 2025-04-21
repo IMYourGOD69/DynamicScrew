@@ -7,7 +7,7 @@ from io import BytesIO
 
 # Language translations
 translations = {
-    "English": {
+    "en": {
         "title": "Dynamic Objects Counting Using Image Processing",
         "upload_image_label": "Upload an Image",
         "failed_load_image": "Failed to load image.",
@@ -24,7 +24,7 @@ translations = {
         "frame_failed": "Failed to capture frame from webcam.",
         "classification_title": "Dynamic Object Classification"
     },
-    "Chinese": {
+    "zh": {
         "title": "使用图像处理的动态对象计数",
         "upload_image_label": "上传图像",
         "failed_load_image": "图像加载失败。",
@@ -183,7 +183,7 @@ def liveDynamic(t):
         cv2.destroyAllWindows()
 
 def main():
-    lang = st.sidebar.selectbox("Language / 语言", ("en", "zh"))
+    lang = st.sidebar.selectbox("Language / 语言", ("English", "Chinese"))
     t = translations[lang]
 
     st.title(t["title"])
