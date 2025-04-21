@@ -7,7 +7,7 @@ from io import BytesIO
 
 # Language translations
 translations = {
-    "en": {
+    "English": {
         "title": "Dynamic Objects Counting Using Image Processing",
         "upload_image_label": "Upload an Image",
         "failed_load_image": "Failed to load image.",
@@ -24,7 +24,7 @@ translations = {
         "frame_failed": "Failed to capture frame from webcam.",
         "classification_title": "Dynamic Object Classification"
     },
-    "zh": {
+    "Chinese": {
         "title": "使用图像处理的动态对象计数",
         "upload_image_label": "上传图像",
         "failed_load_image": "图像加载失败。",
