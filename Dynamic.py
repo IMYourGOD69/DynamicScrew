@@ -5,210 +5,203 @@ import random
 import matplotlib.pyplot as plt
 from io import BytesIO
 
-def upload_image():
-    uploaded_file = st.file_uploader("Upload an Image", type=["jpg", "jpeg", "png", "bmp", "tiff"])
+# Language translations
+translations = {
+    "en": {
+        "title": "Dynamic Objects Counting Using Image Processing",
+        "upload_image_label": "Upload an Image",
+        "failed_load_image": "Failed to load image.",
+        "image_caption": "Detection Dynamic Objects",
+        "choose_operation": "Choose an Operation:",
+        "select_option": "Select an option",
+        "upload_image_classification": "Upload Image for Dynamic Shape Classification",
+        "live_detection": "Live Detection of Dynamic Shapes (Webcam)",
+        "webcam_title": "Live Dynamic Shape Detection (Webcam)",
+        "enter_webcam_id": "Enter Webcam ID (usually 0 or 1):",
+        "start_live": "Start Live Dynamic Shape Detection",
+        "stop_live": "Stop Live Dynamic Detection",
+        "webcam_failed": "Failed to open webcam. Please check the webcam ID.",
+        "frame_failed": "Failed to capture frame from webcam.",
+        "classification_title": "Dynamic Object Classification"
+    },
+    "zh": {
+        "title": "使用图像处理的动态对象计数",
+        "upload_image_label": "上传图像",
+        "failed_load_image": "图像加载失败。",
+        "image_caption": "检测动态对象",
+        "choose_operation": "选择操作：",
+        "select_option": "选择一个选项",
+        "upload_image_classification": "上传图像进行动态形状分类",
+        "live_detection": "实时检测动态形状（摄像头）",
+        "webcam_title": "实时动态形状检测（摄像头）",
+        "enter_webcam_id": "输入摄像头ID（通常为0或1）：",
+        "start_live": "开始实时动态形状检测",
+        "stop_live": "停止实时动态检测",
+        "webcam_failed": "无法打开摄像头。请检查摄像头ID。",
+        "frame_failed": "无法从摄像头捕获帧。",
+        "classification_title": "动态对象分类"
+    }
+}
+
+# Upload image with language support
+def upload_image(upload_label):
+    uploaded_file = st.file_uploader(upload_label, type=["jpg", "jpeg", "png", "bmp", "tiff"])
     if uploaded_file is not None:
         bytes_data = uploaded_file.read()
         image = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
         return image
-    else:
-        return None
+    return None
 
-def process_dynamicImage(image):
+# Dynamic image processing
+def process_dynamicImage(image, t):
     if image is None:
-        st.error("Failed to load image.")
+        st.error(t["failed_load_image"])
         return
 
     max_width = 800
     height, width = image.shape[:2]
     if width > max_width:
         scaling_factor = max_width / width
-        new_size = (int(width * scaling_factor), int(height * scaling_factor))
-        image = cv2.resize(image, new_size)
+        image = cv2.resize(image, (int(width * scaling_factor), int(height * scaling_factor)))
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (7, 7), 0)
     _, thresh = cv2.threshold(blurred, 100, 255, cv2.THRESH_BINARY)
     edges = cv2.Canny(thresh, 50, 200)
-    kernel = np.ones((3, 3), np.uint8)
-    thresh = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    thresh = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     size_groups = []
-    min_area_threshold = 100
-
     for contour in contours:
         area = cv2.contourArea(contour)
-        if area < min_area_threshold:
+        if area < 100:
             continue
-
-        found_group = False
         for idx, (group_area, count) in enumerate(size_groups):
-            mean_area = group_area / count
-            if abs(mean_area - area) <= 500:
+            if abs(group_area / count - area) <= 500:
                 size_groups[idx] = (group_area + area, count + 1)
-                found_group = True
                 break
-
-        if not found_group:
+        else:
             size_groups.append((area, 1))
 
-    colors = [tuple(random.sample(range(256), 3)) for _ in range(len(size_groups))]
-
-    output_image = image.copy()
-    for i, contour in enumerate(contours):
+    colors = [tuple(random.sample(range(256), 3)) for _ in size_groups]
+    output = image.copy()
+    for contour in contours:
         area = cv2.contourArea(contour)
-        if area < min_area_threshold:
+        if area < 100:
             continue
-
         for idx, (group_area, count) in enumerate(size_groups):
-            mean_area = group_area / count
-            if abs(mean_area - area) <= 800:
-                cv2.drawContours(output_image, [contour], -1, colors[idx], 2)
+            if abs(group_area / count - area) <= 800:
+                cv2.drawContours(output, [contour], -1, colors[idx], 2)
                 M = cv2.moments(contour)
-                if M["m00"] != 0:
-                    cX = int(M["m10"] / M["m00"])
-                    cY = int(M["m01"] / M["m00"])
-                else:
-                    cX, cY = 0, 0
-                label = chr(65 + idx)
-                cv2.putText(output_image, label, (cX, cY), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[idx], 2)
+                if M["m00"]:
+                    cX, cY = int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
+                    cv2.putText(output, chr(65 + idx), (cX, cY), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[idx], 2)
                 break
 
-    y0, dy = 30, 30
-    for i, (group_area, count) in enumerate(size_groups):
-        mean_area = group_area / count
-        size_label = f"Size {chr(65 + i)}: {count} (Mean Area: {mean_area:.1f})"
-        cv2.putText(output_image, size_label, (10, y0 + i * dy), cv2.FONT_HERSHEY_SIMPLEX, 0.8, colors[i], 2)
+    for i, (area, count) in enumerate(size_groups):
+        mean_area = area / count
+        cv2.putText(output, f"Size {chr(65+i)}: {count} (Mean Area: {mean_area:.1f})", (10, 30 + i * 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, colors[i], 2)
 
-    output_image_rgb = cv2.cvtColor(output_image, cv2.COLOR_BGR2RGB)
+    st.subheader(t["classification_title"])
+    st.pyplot(plt.imshow(cv2.cvtColor(output, cv2.COLOR_BGR2RGB)), clear_figure=True)
 
-    st.subheader("Dynamic Object Classification")
-    fig, ax = plt.subplots()
-    ax.imshow(output_image_rgb)
-    ax.axis('off')
-    ax.set_title("Dynamic Object Classification")
-    st.pyplot(fig)
-
-def dynamicDetection():
-    image = upload_image()
-    process_dynamicImage(image)
+def dynamicDetection(t):
+    image = upload_image(t["upload_image_label"])
+    process_dynamicImage(image, t)
 
 stable_colors = [
-    (255, 0, 0),     # Red
-    (0, 255, 0),     # Green
-    (0, 0, 255),     # Blue
-    (255, 255, 0),   # Cyan
-    (255, 0, 255),   # Magenta
-    (0, 255, 255),   # Yellow
-    (128, 0, 128),   # Purple
-    (128, 128, 0)    # Olive
+    (255, 0, 0), (0, 255, 0), (0, 0, 255),
+    (255, 255, 0), (255, 0, 255), (0, 255, 255),
+    (128, 0, 128), (128, 128, 0)
 ]
 
 def process_liveDynamic(frame):
     max_width = 800
     height, width = frame.shape[:2]
     if width > max_width:
-        scaling_factor = max_width / width
-        new_size = (int(width * scaling_factor), int(height * scaling_factor))
-        frame = cv2.resize(frame, new_size)
+        frame = cv2.resize(frame, (int(width * max_width / width), int(height * max_width / width)))
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (7, 7), 0)
     _, thresh = cv2.threshold(blurred, 100, 255, cv2.THRESH_BINARY)
     edges = cv2.Canny(thresh, 50, 200)
-    kernel = np.ones((3, 3), np.uint8)
-    thresh = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    thresh = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     size_groups = []
-    min_area_threshold = 100
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area < 100:
+            continue
+        for idx, (group_area, count) in enumerate(size_groups):
+            if abs(group_area / count - area) <= 500:
+                size_groups[idx] = (group_area + area, count + 1)
+                break
+        else:
+            size_groups.append((area, 1))
 
     for contour in contours:
         area = cv2.contourArea(contour)
-        if area < min_area_threshold:
+        if area < 100:
             continue
-
-        found_group = False
         for idx, (group_area, count) in enumerate(size_groups):
-            mean_area = group_area / count
-            if abs(mean_area - area) <= 500:
-                size_groups[idx] = (group_area + area, count + 1)
-                found_group = True
-                break
-
-        if not found_group:
-            size_groups.append((area, 1))
-
-    output_frame = frame.copy()
-    for i, contour in enumerate(contours):
-        area = cv2.contourArea(contour)
-        if area < min_area_threshold:
-            continue
-
-        for idx, (group_area, count) in enumerate(size_groups):
-            mean_area = group_area / count
-            if abs(mean_area - area) <= 800:
+            if abs(group_area / count - area) <= 800:
                 color = stable_colors[idx % len(stable_colors)]
-                cv2.drawContours(output_frame, [contour], -1, color, 2)
+                cv2.drawContours(frame, [contour], -1, color, 2)
                 break
 
-    y0, dy = 50, 30
-    for i, (group_area, count) in enumerate(size_groups):
-        mean_area = group_area / count
-        size_label = f"Size {chr(65 + i)}: {count} (Mean Area: {mean_area:.1f})"
-        color = stable_colors[i % len(stable_colors)]
-        cv2.putText(output_frame, size_label, (10, y0 + i * dy), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 3)
+    for i, (area, count) in enumerate(size_groups):
+        mean_area = area / count
+        cv2.putText(frame, f"Size {chr(65 + i)}: {count} (Mean Area: {mean_area:.1f})", (10, 50 + i * 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, stable_colors[i % len(stable_colors)], 3)
+    return frame
 
-    return output_frame
+def liveDynamic(t):
+    st.subheader(t["webcam_title"])
+    webcam_id = st.number_input(t["enter_webcam_id"], value=1, step=1)
+    start = st.checkbox(t["start_live"])
+    placeholder = st.empty()
 
-def liveDynamic():
-    st.subheader("Live Dynamic Shape Detection (Webcam)")
-    WEBCAM_ID = st.number_input("Enter Webcam ID (usually 0 or 1):", value=1, step=1, key="live_dynamic_webcam_id")
-    live_detection = st.checkbox("Start Live Dynamic Shape Detection")
-    video_placeholder = st.empty()
-
-    if live_detection:
-        cap = cv2.VideoCapture(WEBCAM_ID)
+    if start:
+        cap = cv2.VideoCapture(webcam_id)
         if not cap.isOpened():
-            st.error("Failed to open webcam. Please check the webcam ID.")
+            st.error(t["webcam_failed"])
             return
 
-        while live_detection:
+        stop = False
+        while not stop:
             ret, frame = cap.read()
             if not ret:
-                st.warning("Failed to capture frame from webcam.")
+                st.warning(t["frame_failed"])
                 break
-
-            processed_frame = process_liveDynamic(frame)
-            video_placeholder.image(processed_frame, channels="BGR")
-
-            if st.button("Stop Live Dynamic Detection"):
-                live_detection = False
+            placeholder.image(process_liveDynamic(frame), channels="BGR")
+            if st.button(t["stop_live"]):
+                stop = True
 
         cap.release()
         cv2.destroyAllWindows()
 
 def main():
-    st.title("Dynamic Objects Counting Using Image Processing")
+    lang = st.sidebar.selectbox("Language / 语言", ("en", "zh"))
+    t = translations[lang]
 
-    # Load and display an image
-    st.image("DynamicScrew.png", caption="Detection Dynamic Objects", use_container_width=True)  # Updated parameter
+    st.title(t["title"])
+    st.image("DynamicScrew.png", caption=t["image_caption"], use_container_width=True)
 
-    operation_type = st.sidebar.selectbox(
-        "Choose an Operation:",
+    operation = st.sidebar.selectbox(
+        t["choose_operation"],
         (
-            "Select an option",
-            "Upload Image for Dynamic Shape Classification",
-            "Live Detection of Dynamic Shapes (Webcam)",
-        ),
+            t["select_option"],
+            t["upload_image_classification"],
+            t["live_detection"]
+        )
     )
 
-    if operation_type == "Upload Image for Dynamic Shape Classification":
-        dynamicDetection()
-
-    elif operation_type == "Live Detection of Dynamic Shapes (Webcam)":
-        liveDynamic()
+    if operation == t["upload_image_classification"]:
+        dynamicDetection(t)
+    elif operation == t["live_detection"]:
+        liveDynamic(t)
 
 if __name__ == "__main__":
     main()
